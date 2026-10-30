@@ -6,4 +6,5 @@ import '@fontsource/noto-sans-kr/700.css';
 import '@fontsource/noto-serif-kr/400.css';
 import App from './App';
 import './style.css';
+import './readability.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);

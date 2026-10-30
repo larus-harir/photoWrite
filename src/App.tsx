@@ -41,6 +41,7 @@ export default function App() {
   const [dragOver,setDragOver] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
   const exportRef = useRef<HTMLElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const drag = useRef<{x:number;y:number;crop:Project['crop']} | null>(null);
   const patch = useCallback((updates:Partial<Project>)=>setProject(p=>({...p,...updates})),[]);
@@ -120,6 +121,13 @@ export default function App() {
       setNotice(all?'캐러셀 ZIP 파일을 저장했습니다.':'현재 페이지 PNG를 저장했습니다.');
     }catch(e){setError(e instanceof Error?e.message:'내보내지 못했습니다. 기본 해상도로 다시 시도해 주세요.');}
     finally{setBusy(false);setProgress('');}
+  }
+  function fitPreview() {
+    const viewport=previewRef.current;
+    if(!viewport)return;
+    const base=parseFloat(getComputedStyle(viewport).getPropertyValue('--preview-base'));
+    const width=Math.min(viewport.clientWidth-48,Math.max(120,viewport.clientHeight-96)*.8);
+    setZoom(Math.max(20,Math.min(200,Math.floor(width/base*100))));
   }
   function reorder(direction:number) {
     const target=currentIndex+direction;
@@ -221,14 +229,14 @@ export default function App() {
       </aside>
       <main className="center-panel">
         <div className="canvas-toolbar"><div className="breadcrumb"><span className="green-dot"/> LIVE PREVIEW <i>/</i><span>{kindNames[current.kind]}</span></div><div className="canvas-controls"><span>4:5</span><button className="icon-button" onClick={()=>setFocusPreview(v=>!v)} aria-label={focusPreview?'편집기로 돌아가기':'미리보기 크게 보기'}>{focusPreview?<PanelLeftClose size={16}/>:<Expand size={16}/>}</button></div></div>
-        <div className="preview-stage">
+        <div ref={previewRef} className="preview-viewport"><div className="preview-stage">
           <div className="preview-kicker"><span>{template.name}</span><span>NO. {project.number||'—'}</span></div>
           <div className={`canvas-shell ${current.kind==='cover'?'draggable':''}`} style={{width:`min(calc(var(--preview-base) * ${zoom/100}), 100%)`}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
             {image&&fontReady?<PageCanvas project={project} page={current} image={image} onError={setError}/>:<div className="canvas-loading"><LoaderCircle className="spin" size={22}/><span>사진과 글꼴을 준비하는 중</span></div>}
           </div>
           <div className="preview-caption"><span>{String(currentIndex+1).padStart(2,'0')}</span><span className="caption-line"/><span>{kindNames[current.kind]}</span>{current.kind==='cover'&&<small>사진을 드래그해 구도를 맞춰보세요</small>}</div>
         </div>
-        <div className="zoom-bar"><button className="icon-button" aria-label="미리보기 축소" onClick={()=>setZoom(z=>Math.max(60,z-10))}><Minus size={14}/></button><button className="zoom-value" onClick={()=>setZoom(100)}>{zoom}%</button><button className="icon-button" aria-label="미리보기 확대" onClick={()=>setZoom(z=>Math.min(160,z+10))}><Plus size={14}/></button><span/><button className="icon-button" aria-label="미리보기 크기 초기화" onClick={()=>setZoom(100)}><Maximize2 size={13}/></button></div>
+        </div><div className="zoom-bar"><button className="icon-button" aria-label="미리보기 축소" onClick={()=>setZoom(z=>Math.max(20,z-10))}><Minus size={14}/></button><button className="zoom-value" onClick={()=>setZoom(100)}>{zoom}%</button><button className="icon-button" aria-label="미리보기 확대" onClick={()=>setZoom(z=>Math.min(200,z+10))}><Plus size={14}/></button><span/><button className="icon-button" aria-label="화면에 맞춤" onClick={fitPreview}><Maximize2 size={13}/><span>화면에 맞춤</span></button></div>
         <section className="filmstrip"><div className="filmstrip-header"><h2>페이지 <span>{pages.length}</span></h2><span>사진에서 문장으로, 하나의 이야기</span><button onClick={()=>{setTab('content');bodyRef.current?.focus();}} title="본문 편집으로 이동"><FileText size={13}/> 본문 편집</button></div><div className="thumbnail-list">
           {pages.map((page,i)=><button key={page.id} className={`thumbnail ${current.id===page.id?'active':''}`} onClick={()=>setSelected(page.id)} aria-label={`${i+1}페이지 ${kindNames[page.kind]}`}><div className="thumb-art">{image&&fontReady&&<PageCanvas project={project} page={page} image={image} thumbnail onError={setError}/>}<span className="thumb-number">{String(i+1).padStart(2,'0')}</span>{current.id===page.id&&<span className="thumb-check"><Check size={10}/></span>}</div><span className="thumb-label">{kindNames[page.kind]}{page.kind==='text'?` ${pages.slice(0,i+1).filter(p=>p.kind==='text').length}`:''}</span></button>)}
         </div></section>
