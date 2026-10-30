@@ -3,19 +3,13 @@ import { normalizeProject } from '../defaults';
 const DB_NAME = 'frame-words';
 async function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 2);
-    request.onupgradeneeded = () => {
+    const request = indexedDB.open(DB_NAME, 3);
+    request.onupgradeneeded = event => {
       const db = request.result;
       const store = db.objectStoreNames.contains('projects') ? request.transaction!.objectStore('projects') : db.createObjectStore('projects');
-      // Move the v1 single draft atomically; do not discard the user's old work.
-      const legacy = store.get('current');
-      legacy.onsuccess = () => {
-        if (legacy.result) {
-          const migrated = normalizeProject(legacy.result);
-          store.put(migrated, migrated.id);
-          store.delete('current');
-        }
-      };
+      // One-time clean start requested for the old prototype's saved projects.
+      // Version 3 projects survive later opens, reloads and future upgrades.
+      if (event.oldVersion > 0 && event.oldVersion < 3) store.clear();
     };
     request.onsuccess = () => {
       const db=request.result;

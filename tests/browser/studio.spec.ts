@@ -79,21 +79,40 @@ test('blank studio, independent drafts, duplication, deletion and font persisten
   await expect(page.getByLabel('제목 글꼴',{exact:true})).toHaveValue('noto-sans');
 });
 
-test('atomically migrates a v1 current draft, preserving original image and text',async({page})=>{
-  await page.goto('/');
-  const legacy=await page.evaluate(async()=>{
-    const path='/src/defaults.ts';const{blankProject}=await import(path);const p=blankProject();const c=document.createElement('canvas');c.width=4;c.height=5;const ctx=c.getContext('2d')!;ctx.fillStyle='#778899';ctx.fillRect(0,0,4,5);p.photo=c.toDataURL();p.photoWidth=4;p.photoHeight=5;p.body='이전 버전에서 작성한 글입니다.\n\n공백과 문장도 보존합니다.';
-    delete p.id;delete p.createdAt;delete p.updatedAt;delete p.titleFont;delete p.bodyFont;p.title='이전 버전의 내 작업';
-    await new Promise<void>((resolve,reject)=>{const r=indexedDB.deleteDatabase('frame-words');r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});
-    await new Promise<void>((resolve,reject)=>{const r=indexedDB.open('frame-words',1);r.onupgradeneeded=()=>r.result.createObjectStore('projects');r.onsuccess=()=>{const db=r.result;const t=db.transaction('projects','readwrite');t.objectStore('projects').put(p,'current');t.oncomplete=()=>{db.close();resolve();};};r.onerror=()=>reject(r.error);});
-    return {body:p.body,photo:p.photo};
+for (const version of [1,2]) {
+  test(`clears v${version} prototype projects once, then preserves newly created work`,async({page})=>{
+    await page.goto('/');
+    await expect(page.locator('.studio-empty')).toBeVisible();
+    await page.evaluate(async(version)=>{
+      const path='/src/defaults.ts';const {blankProject}=await import(path);
+      const old=blankProject();old.title='이전 프로젝트';old.body='이전 버전의 저장 데이터';
+      await new Promise<void>((resolve,reject)=>{const r=indexedDB.deleteDatabase('frame-words');r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});
+      await new Promise<void>((resolve,reject)=>{
+        const r=indexedDB.open('frame-words',version);
+        r.onupgradeneeded=()=>r.result.createObjectStore('projects');
+        r.onsuccess=()=>{
+          const db=r.result;const tx=db.transaction('projects','readwrite');const store=tx.objectStore('projects');
+          store.put(old,version===1?'current':old.id);
+          if(version===2){const empty=blankProject();store.put(empty,empty.id);}
+          tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);
+        };r.onerror=()=>reject(r.error);
+      });
+    },version);
+    await page.reload();
+    await expect(page.getByText('아직 쓰이지 않은 이야기')).toBeVisible();
+    await expect(page.locator('.project-card')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText('아직 쓰이지 않은 이야기')).toBeVisible();
+    await expect(page.locator('.project-card')).toHaveCount(0);
+    await page.getByRole('button',{name:'새 프로젝트',exact:true}).click();
+    await expect(page.getByLabel('제목',{exact:true})).toHaveValue('');
+    await expect(page.getByRole('textbox',{name:'본문',exact:true})).toHaveValue('');
+    await page.getByLabel('제목',{exact:true}).fill('새로 만든 프로젝트');
+    await page.getByRole('textbox',{name:'본문',exact:true}).fill('새 작업은 계속 저장합니다.');
+    await page.getByRole('button',{name:'작업실로 돌아가기',exact:true}).click();
+    await page.reload();
+    await expect(page.locator('.project-card')).toHaveCount(1);
+    await page.getByRole('button',{name:'새로 만든 프로젝트 열기',exact:true}).click();
+    await expect(page.getByRole('textbox',{name:'본문',exact:true})).toHaveValue('새 작업은 계속 저장합니다.');
   });
-  await page.reload();
-  await expect(page.locator('.project-card')).toHaveCount(1);
-  await page.getByRole('button',{name:'이전 버전의 내 작업 열기',exact:true}).click();
-  await expect(page.getByRole('textbox',{name:'본문',exact:true})).toHaveValue(legacy.body);
-  await expect(page.locator('.photo-upload img')).toHaveAttribute('src',legacy.photo);
-  await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled();
-  await page.getByRole('button',{name:'작업실로 돌아가기',exact:true}).click();
-  await page.reload();await expect(page.locator('.project-card')).toHaveCount(1);
-});
+}
