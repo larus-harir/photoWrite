@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { exampleProject } from '../src/defaults';
+import { blankProject } from '../src/defaults';
 import { orderedPages, paginate, textGeometry, wrapText } from '../src/lib/pagination';
 const measure=(s:string)=>Array.from(new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(s)).length*36;
-const build=(body:string)=>paginate({...exampleProject(),body},()=>measure);
+const build=(body:string)=>paginate({...blankProject(),title:'테스트 제목',body},()=>measure);
 describe('lossless Korean pagination',()=>{
   it('preserves Korean, English, punctuation, emoji, blank lines, CRLF and trailing newlines',()=>{
     const body=('한글과 English words, “인용” 理想. 👨‍👩‍👧‍👦 café\r\n\n  공백도 그대로.\n\n').repeat(80)+'마지막\n';
@@ -43,7 +43,7 @@ describe('lossless Korean pagination',()=>{
     expect(build(' \n ').map(p=>p.kind)).toEqual(['cover','photo']);
   });
   it('remeasures a page-specific font and margin before allocating lines',()=>{
-    const p={...exampleProject(),body:'다양한 문자가 있는 긴 글입니다. '.repeat(250),pageStyles:{'text-0-0':{fontSize:48,margin:140,showTitle:false}}};
+    const p={...blankProject(),title:'테스트 제목',body:'다양한 문자가 있는 긴 글입니다. '.repeat(250),pageStyles:{'text-0-0':{fontSize:48,margin:140,showTitle:false}}};
     const pages=paginate(p,size=>s=>measure(s)*size/36).filter(p=>p.kind==='text');
     expect(pages[0].style.fontSize).toBe(48);
     for(const page of pages){const geo=textGeometry(page.style,p.lineHeight);expect(page.lines.length).toBeLessThanOrEqual(geo.capacity);}

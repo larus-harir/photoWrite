@@ -4,20 +4,28 @@ import JSZip from 'jszip';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-async function openExample(page:BrowserPage){
+async function openProject(page:BrowserPage){
   await page.goto('/');
-  await page.getByRole('button',{name:'예시 불러오기',exact:true}).click();
-  await page.getByRole('button',{name:'꿈 예시 열기',exact:true}).click();
+  await page.getByRole('button',{name:'새 프로젝트',exact:true}).click();
+  await page.getByLabel('제목',{exact:true}).fill('테스트 프로젝트');
+  await page.getByLabel('작품 번호',{exact:true}).fill('005');
+  await page.getByRole('textbox',{name:'본문',exact:true}).fill('테스트용 본문입니다.\n\n원문 그대로 보관합니다.');
+  await page.locator('.metadata summary').click();
+  await page.getByLabel('촬영 연도',{exact:true}).fill('2025');
+  await page.getByLabel('장소',{exact:true}).fill('테스트 장소');
+  await page.getByLabel('카메라',{exact:true}).fill('카메라');
+  await page.getByLabel('필름',{exact:true}).fill('필름');
+  await page.getByLabel('사진 파일 업로드').setInputFiles(resolve('tests/fixtures/photo.png'));
 }
 
 test('upload, edit, crop, switch templates, persist and export full resolution PNG/ZIP',async({page},testInfo)=>{
   const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await openExample(page);
+  await openProject(page);
   const all=page.getByRole('button',{name:'전체 다운로드 ZIP'});
   await expect(all).toBeEnabled({timeout:60_000});
   await page.screenshot({path:testInfo.outputPath('editor-original.png'),fullPage:true});
-  await page.getByLabel('사진 파일 업로드').setInputFiles(resolve('public/demo/reference-1.jpeg'));
+  await page.getByLabel('사진 파일 업로드').setInputFiles(resolve('tests/fixtures/photo.png'));
   await expect(page.getByRole('status').filter({hasText:'사진을 불러왔습니다'})).toBeVisible();
   await page.getByLabel('제목',{exact:true}).fill('빛이 머무는 자리');
   await page.getByLabel('부제 · 선택').fill('아주 작은 기록');
@@ -40,7 +48,7 @@ test('upload, edit, crop, switch templates, persist and export full resolution P
   await page.getByRole('button',{name:/새로운 시선 Film Archive/}).click();
   await expect(page.locator('.preview-kicker')).toContainText('Film Archive');
   await page.screenshot({path:testInfo.outputPath('editor-film.png'),fullPage:true});
-  await page.getByRole('button',{name:/기존 스타일 Original Archive/}).click();
+  await page.getByRole('button',{name:/사진 중심 Original Archive/}).click();
   await page.getByRole('tab',{name:'콘텐츠',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'본문',exact:true})).toHaveValue(body);
   // Photo pages use unmodified image pixels; cover-only gradient does not affect them.
@@ -48,7 +56,7 @@ test('upload, edit, crop, switch templates, persist and export full resolution P
   await expect(page.locator('.preview-caption')).toContainText('사진 · 정보');
   const pixel=await page.locator('.canvas-shell canvas').evaluate(async(node)=>{
     const canvas=node as HTMLCanvasElement;
-    const photo=new Image();photo.src='/demo/reference-1.jpeg';await photo.decode();
+    const photo=new Image();photo.src=document.querySelector<HTMLImageElement>('.photo-upload img')!.src;await photo.decode();
     const source=document.createElement('canvas');source.width=photo.naturalWidth;source.height=photo.naturalHeight;
     const ctx=source.getContext('2d')!;ctx.drawImage(photo,0,0);
     return {actual:Array.from(canvas.getContext('2d')!.getImageData(540,626,1,1).data),original:Array.from(ctx.getImageData(Math.floor(photo.naturalWidth/2),Math.floor(photo.naturalHeight/2),1,1).data)};
@@ -98,7 +106,7 @@ test('upload, edit, crop, switch templates, persist and export full resolution P
 });
 
 test('page controls reflow, manual breaks, blank body, validation and mobile layout',async({page},testInfo)=>{
-  await openExample(page);await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
+  await openProject(page);await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
   const body=page.getByRole('textbox',{name:'본문',exact:true});
   await body.fill('첫 페이지입니다.\n둘째 문장입니다.');
   await body.evaluate((el:HTMLTextAreaElement)=>{el.focus();el.setSelectionRange(10,10);});
@@ -129,14 +137,15 @@ test('page controls reflow, manual breaks, blank body, validation and mobile lay
 });
 
 test('all templates keep maximum-length titles and metadata inside the canvas, with one handle per page',async({page})=>{
-  await openExample(page);await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
-  const result=await page.evaluate(async()=>{
+  await openProject(page);await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
+  const photoSource=await page.locator('.photo-upload img').getAttribute('src');
+  const result=await page.evaluate(async(photoSource)=>{
     const renderPath='/src/lib/render.ts', defaultPath='/src/defaults.ts',paginationPath='/src/lib/pagination.ts', mediaPath='/src/lib/media.ts';
     const {renderPage,coverBox}=await import(renderPath);
-    const {exampleProject}=await import(defaultPath);
+    const {blankProject}=await import(defaultPath);
     const {paginate}=await import(paginationPath);
     const {ensureFonts,loadImage}=await import(mediaPath);
-    const p=exampleProject();
+    const p=blankProject();p.photo=photoSource;p.handle='@author';
     p.title='가'.repeat(60);p.subtitle='나'.repeat(80);p.year='2'.repeat(10);p.location='다'.repeat(50);p.camera='라'.repeat(80);p.film='마'.repeat(80);p.description='바'.repeat(140);p.body=('한국어 English 理想과 “인용” — 👨‍👩‍👧‍👦\n\n').repeat(20);
     await ensureFonts([p.title,p.subtitle,p.year,p.location,p.camera,p.film,p.description,p.body].join(''));
     const image=await loadImage(p.photo);
@@ -164,7 +173,7 @@ test('all templates keep maximum-length titles and metadata inside the canvas, w
       }
     }finally{CanvasRenderingContext2D.prototype.fillText=original;}
     return {records,pageCount:pages.length,handle:p.handle};
-  });
+  },photoSource);
   for(const record of result.records){
     expect(record.x,JSON.stringify(record)).toBeGreaterThanOrEqual(-1);
     expect(record.right,JSON.stringify(record)).toBeLessThanOrEqual(1081);
@@ -176,7 +185,7 @@ test('all templates keep maximum-length titles and metadata inside the canvas, w
 
 test('reports missing fonts and blocks export instead of using fallback text',async({page})=>{
   await page.route(/\.woff2?(\?.*)?$/,route=>route.abort('failed'));
-  await openExample(page);
+  await openProject(page);
   await expect(page.getByRole('alert')).toContainText('글꼴을 불러오지 못했습니다',{timeout:30_000});
   await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeDisabled();
 });

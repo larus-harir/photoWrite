@@ -22,8 +22,8 @@ function Range({label,value,min,max,step=1,onChange,suffix=''}:{label:string;val
 function Toggle({label,value,onChange}:{label:string;value:boolean;onChange:(b:boolean)=>void}) {
   return <label className="toggle-row"><span>{label}</span><input type="checkbox" checked={value} onChange={e=>onChange(e.target.checked)}/><span className="switch"/></label>;
 }
-interface EditorProps { initialProject:Project; onSaved:(p:Project)=>void; onBack:()=>void; onExample:(index:number)=>Promise<void> }
-export default function App({initialProject,onSaved,onBack,onExample}:EditorProps) {
+interface EditorProps { initialProject:Project; onSaved:(p:Project)=>void; onBack:()=>void; }
+export default function App({initialProject,onSaved,onBack}:EditorProps) {
   const [project,setProject] = useState<Project>(initialProject);
   const [leaving,setLeaving] = useState(false);
   const [saved,setSaved] = useState('브라우저에 저장됨');
@@ -154,12 +154,11 @@ export default function App({initialProject,onSaved,onBack,onExample}:EditorProp
       if(element)element.scrollTop=element.scrollHeight*(start/Math.max(1,project.body.length));
     });
   }
-  async function leave(exampleIndex?:number) {
+  async function leave() {
     if(leaving||busy)return;
     setLeaving(true);
     try {
       const saved=await saveProject(project);onSaved(saved);onBack();
-      if(exampleIndex!==undefined)await onExample(exampleIndex);
     } catch {setError('작업을 저장하지 못했습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.');setLeaving(false);}
   }
   function pointerDown(e:PointerEvent<HTMLDivElement>) {
@@ -218,7 +217,7 @@ export default function App({initialProject,onSaved,onBack,onExample}:EditorProp
               </button>)}
             </section>
             <Typography project={project} onChange={patch}/><section className="form-section"><div className="section-label"><Settings2 size={15}/><h2>본문 기본 스타일</h2></div><Range label="글자 크기" value={project.fontSize} min={28} max={48} suffix=" px" onChange={v=>patch({fontSize:v})}/><Range label="줄 간격" value={project.lineHeight} min={1.3} max={2} step={.05} onChange={v=>patch({lineHeight:v})}/><Range label="좌우 여백" value={project.margin} min={48} max={140} suffix=" px" onChange={v=>patch({margin:v})}/><Toggle label="본문 페이지에 제목 표시" value={project.showTitle} onChange={v=>patch({showTitle:v})}/><Toggle label="작품 번호 표시" value={project.showNumber} onChange={v=>patch({showNumber:v})}/><Field label="본문 세로 정렬"><select value={project.textAlign} onChange={e=>patch({textAlign:e.target.value as 'top'|'center'})}><option value="top">위쪽 정렬</option><option value="center">가운데 정렬</option></select></Field><p className="hint">글자를 줄이지 않고 다음 페이지로 이어집니다. 페이지별 설정이 있으면 그 설정을 우선합니다.</p></section>
-            <section className="form-section"><div className="section-label"><h2>기존 게시물 살펴보기</h2></div><p className="muted small">PDF 예시를 새 프로젝트로 엽니다. 현재 작업은 유지돼요.</p><div className="examples">{['꿈','이상은 이상','기억력'].map((title,i)=><button key={title} disabled={leaving||busy} onClick={()=>void leave(i)}>{title}<ArrowRight size={13}/></button>)}</div></section>
+
           </>}
           <div className="local-note"><ShieldCheck size={15}/><span>사진과 글은 이 브라우저에만 저장돼요.<br/>외부 서버로 전송하지 않습니다.</span></div>
         </div>

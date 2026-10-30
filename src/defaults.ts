@@ -1,20 +1,23 @@
 import type { Project } from './types';
-import examples from './examples.json';
-export function exampleProject(index = 0): Project {
-  const example = examples[index];
+
+/** A new project contains settings only, never someone else's content. */
+export function blankProject(): Project {
   return {
-    version: 1, id:crypto.randomUUID(), createdAt:Date.now(), updatedAt:Date.now(), titleFont:'noto-sans', bodyFont:'noto-sans', title: example.title, subtitle: ['부제-포도','사랑하고 바라기에 가엾은','부제-우로보로스'][index],
-    number: ['005','004','006'][index], showNumber: true, body: example.body,
-    year: '2025', location: index===2 ? '대전' : '군산', camera: index===2 ? 'nikon p950' : 'nikon f2', film: index===2 ? '' : 'cinestill 800t-china',
-    description: index===2 ? '작품 : 최우람 - 우로보로스' : '', handle:'@cw_b_site', showHandle:true,
-    template:'original', photo:example.photo, photoName:`${example.title} · 레퍼런스 사진`, photoWidth:[1147,1008,1164][index], photoHeight:[1434,1258,1455][index],
-    crop:{x:.5,y:.5,zoom:1}, gradient:.55, fontSize:36, lineHeight:1.65, margin:64, showTitle:true, textAlign:'top', pageStyles:{}, pageOrder:[],
+    version:1, id:crypto.randomUUID(), createdAt:Date.now(), updatedAt:Date.now(),
+    title:'', subtitle:'', number:'', body:'', year:'', location:'', camera:'', film:'', description:'', handle:'',
+    photo:'', photoName:'', photoWidth:0, photoHeight:0,
+    titleFont:'noto-sans', bodyFont:'noto-sans', template:'original',
+    showNumber:true, showHandle:true, showTitle:true, textAlign:'top',
+    crop:{x:.5,y:.5,zoom:1}, gradient:.55, fontSize:36, lineHeight:1.65, margin:64,
+    pageStyles:{}, pageOrder:[],
   };
 }
-
-export function blankProject(): Project {
-  return { ...exampleProject(), title:'', subtitle:'', number:'', body:'', year:'', location:'', camera:'', film:'', description:'', handle:'', photo:'', photoName:'', photoWidth:0, photoHeight:0 };
-}
-export function normalizeProject(project: Project): Project {
-  return { ...blankProject(), ...project };
+export function normalizeProject(project:Project):Project {
+  const normalized={...blankProject(),...project};
+  // Bundled demo files are no longer shipped. Preserve locally edited text,
+  // but show a usable upload state instead of requesting a removed image.
+  if(normalized.photo.startsWith('/demo/')) {
+    normalized.photo='';normalized.photoName='';normalized.photoWidth=0;normalized.photoHeight=0;
+  }
+  return normalized;
 }
