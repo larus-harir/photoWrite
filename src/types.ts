@@ -1,9 +1,13 @@
+import type { FontId } from './lib/fonts';
 export type TemplateId = 'original' | 'editorial' | 'film';
 export type PageKind = 'cover' | 'photo' | 'text';
 export interface Crop { x: number; y: number; zoom: number }
 export interface PageStyle { fontSize?: number; margin?: number; align?: 'top' | 'center'; showTitle?: boolean }
 export interface Project {
   version: 1;
+  id: string; createdAt: number; updatedAt: number;
+  titleFont: FontId; bodyFont: FontId;
+  coverTitleSize?: number; textTitleSize?: number; subtitleSize?: number;
   title: string; subtitle: string; number: string; showNumber: boolean;
   body: string; year: string; location: string; camera: string; film: string; description: string;
   handle: string; showHandle: boolean; template: TemplateId;

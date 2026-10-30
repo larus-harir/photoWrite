@@ -1,6 +1,7 @@
 import type { Page, Project } from '../types';
 import { templates } from '../types';
-import { BODY_FONT, HEIGHT, TITLE_FONT, WIDTH, textGeometry, wrapText } from './pagination';
+import { bodyFont, titleFont } from './fonts';
+import { BODY_FONT, HEIGHT, WIDTH, textGeometry, wrapText } from './pagination';
 
 export function coverBox(p: Project) {
   if (p.template === 'editorial') return { x: 68, y: 212, w: 944, h: 760 };
@@ -25,23 +26,24 @@ function photo(ctx: CanvasRenderingContext2D, image: HTMLImageElement, box: {x:n
   }
   ctx.restore();
 }
-function font(ctx: CanvasRenderingContext2D, size: number, weight = 400, serif = false) {
-  ctx.font = `${weight} ${size}px ${serif ? TITLE_FONT : BODY_FONT}`;
+function font(ctx: CanvasRenderingContext2D, size: number, weight = 400, family = BODY_FONT) {
+  ctx.font = `${weight} ${size}px ${family}`;
 }
 function rule(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
   ctx.save(); ctx.globalAlpha = .3; ctx.fillRect(x, y, w, 1.5); ctx.restore();
 }
-function fitLines(ctx: CanvasRenderingContext2D, text: string, width: number, initial: number, min: number, maxLines: number, serif = false, weight = 400) {
+function fitLines(ctx: CanvasRenderingContext2D, text: string, width: number, initial: number, min: number, maxLines: number, family = BODY_FONT, weight = 400, height = Infinity) {
   let size = initial;
   while (size > min) {
-    font(ctx, size, weight, serif);
-    if (wrapText(text, s => ctx.measureText(s).width, width).length <= maxLines) break;
+    font(ctx, size, weight, family);
+    const lines=wrapText(text, s => ctx.measureText(s).width, width);
+    if (lines.length <= maxLines && lines.length*size*1.3<=height) break;
     size -= 2;
   }
-  font(ctx, size, weight, serif);
+  font(ctx, size, weight, family);
   return { size, lines: wrapText(text, s => ctx.measureText(s).width, width) };
 }
-export function renderPage(canvas: HTMLCanvasElement, p: Project, page: Page, image: HTMLImageElement, scale = 1) {
+export function renderPage(canvas: HTMLCanvasElement, p: Project, page: Page, image: HTMLImageElement | null, scale = 1) {
   // Detached export canvases otherwise inherit the browser's language, while
   // previews inherit <html lang="ko">. Font locale variants must match.
   canvas.lang = 'ko';
@@ -59,7 +61,7 @@ export function renderPage(canvas: HTMLCanvasElement, p: Project, page: Page, im
   ctx.fillStyle = ink;
   if (page.kind === 'cover') {
     const box = coverBox(p);
-    photo(ctx, image, box, 'cover', p);
+    if(image)photo(ctx, image, box, 'cover', p);
     if (original && p.gradient > 0) {
       const gradient = ctx.createLinearGradient(0, 500, 0, HEIGHT);
       gradient.addColorStop(0, 'rgba(0,0,0,0)');
@@ -78,20 +80,21 @@ export function renderPage(canvas: HTMLCanvasElement, p: Project, page: Page, im
       if (editorial) rule(ctx, 68, 105, 944);
     }
     const titleX = original ? 42 : 68;
-    const title = fitLines(ctx, p.title || '제목 없는 기록', original ? 980 : 944, original ? 106 : 68, 24, 2, editorial, original ? 700 : 400);
-    // Variable font size keeps all titles (up to the input limit) within the cover's title area.
-    const subtitle = fitLines(ctx, p.subtitle, 944, original ? 48 : 28, 18, 2);
+    const subtitle = fitLines(ctx, p.subtitle, 944, p.subtitleSize ?? (original ? 48 : 28), 18, 2, bodyFont(p));
+    const available=original ? 530 : HEIGHT-112-(box.y+box.h+24);
+    const titleHeight=available-(p.subtitle ? 12+subtitle.lines.length*subtitle.size*1.3 : 0);
+    const title = fitLines(ctx, p.title, original ? 980 : 944, p.coverTitleSize ?? (original ? 106 : 68), 14, 2, titleFont(p), original ? 700 : 400, titleHeight);
     const step = title.size * 1.22;
     const titleY = HEIGHT - (original ? 180 : 112) - title.lines.length * step - (p.subtitle ? 12 + subtitle.lines.length * subtitle.size * 1.3 : 0);
-    font(ctx, title.size, original ? 700 : 400, editorial);
+    font(ctx, title.size, original ? 700 : 400, titleFont(p));
     title.lines.forEach((line, i) => ctx.fillText(line.text, titleX, titleY + i * step));
     const subtitleY = titleY + title.lines.length * step + 12;
-    font(ctx, subtitle.size);
+    font(ctx, subtitle.size, 400, bodyFont(p));
     subtitle.lines.forEach((line,i) => ctx.fillText(line.text, titleX, subtitleY + i * subtitle.size * 1.3));
-    if (editorial) { font(ctx, 24, 400, true); ctx.fillText('사진과 문장 사이', 68, 143); }
+    if (editorial) { font(ctx, 24, 400, titleFont(p)); ctx.fillText('사진과 문장 사이', 68, 143); }
   } else if (page.kind === 'photo') {
     if (!original) {
-      font(ctx, 22); ctx.fillText(editorial ? 'THE PHOTOGRAPH' : `FRAME ${p.number || '001'}`, 68, 58);
+      font(ctx, 22); ctx.fillText(editorial ? 'THE PHOTOGRAPH' : `FRAME ${p.number || '—'}`, 68, 58);
       rule(ctx, 68, 110, 944);
     }
     const metadata = [[p.year, p.location].filter(Boolean).join(', '), [p.camera,p.film].filter(Boolean).join(' · '),p.description].filter(Boolean).join('\n');
@@ -100,7 +103,7 @@ export function renderPage(canvas: HTMLCanvasElement, p: Project, page: Page, im
     const metadataHeight = fitted.lines.length * fitted.size * 1.5;
     const metadataTop = Math.min(original ? 1183 : 1110, 1240 - metadataHeight);
     const photoTop = original ? 104 : 166;
-    photo(ctx, image, { x: original ? 94 : 68, y: photoTop, w: original ? 892 : 944, h: metadataTop - photoTop - 20 }, 'contain', p);
+    if(image)photo(ctx, image, { x: original ? 94 : 68, y: photoTop, w: original ? 892 : 944, h: metadataTop - photoTop - 20 }, 'contain', p);
     ctx.fillStyle = ink;
     ctx.textAlign = original ? 'center' : 'left';
     fitted.lines.forEach((line, i) => ctx.fillText(line.text, original ? 540 : 68, metadataTop + i*fitted.size*1.5));
@@ -114,10 +117,10 @@ export function renderPage(canvas: HTMLCanvasElement, p: Project, page: Page, im
       rule(ctx, style.margin, 112, WIDTH - style.margin*2);
     }
     if (style.showTitle) {
-      const title = fitLines(ctx, p.title || '제목 없는 기록', geo.width, original ? 82 : 66, 22, 3, editorial, original ? 700 : 400);
+      const title = fitLines(ctx, p.title, geo.width, p.textTitleSize ?? (original ? 82 : 66), 22, 3, titleFont(p), original ? 700 : 400, 290);
       title.lines.forEach((line, i) => ctx.fillText(line.text, style.margin, (original ? 150 : 182) + i*title.size*1.25));
     }
-    font(ctx, style.fontSize);
+    font(ctx, style.fontSize, 400, bodyFont(p));
     const usedHeight = page.lines.length * geo.step;
     const y = style.align === 'center' ? geo.top + (geo.bottom-geo.top-usedHeight)/2 : geo.top;
     page.lines.forEach((line, i) => ctx.fillText(line.text, geo.x, y + i*geo.step));

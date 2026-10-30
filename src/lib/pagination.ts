@@ -43,7 +43,7 @@ export function textGeometry(style: Required<PageStyle>, lineHeight: number) {
   return { x: style.margin, top, bottom, width: WIDTH - 2 * style.margin, step, capacity: Math.max(1, Math.floor((bottom - top) / step)) };
 }
 export function defaultStyle(p: Project): Required<PageStyle> {
-  return { fontSize: p.fontSize, margin: p.margin, align: p.textAlign, showTitle: p.showTitle };
+  return { fontSize: p.fontSize, margin: p.margin, align: p.textAlign, showTitle: p.showTitle && !!p.title.trim() };
 }
 /** Page-specific metrics are applied before allocating each page, never after. */
 export function paginate(p: Project, measureFactory: (size: number) => Measure): Page[] {

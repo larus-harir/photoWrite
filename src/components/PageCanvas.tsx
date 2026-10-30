@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { Page, Project } from '../types';
 import { renderPage } from '../lib/render';
-interface Props { project: Project; page: Page; image: HTMLImageElement; thumbnail?: boolean; onError: (s: string) => void }
+interface Props { project: Project; page: Page; image: HTMLImageElement | null; thumbnail?: boolean; onError: (s: string) => void }
 export function PageCanvas({project,page,image,thumbnail,onError}: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {

@@ -1,3 +1,5 @@
+import { fontFamily } from './fonts';
+import type { FontId } from './fonts';
 const cache = new Map<string, Promise<HTMLImageElement>>();
 export function loadImage(src: string): Promise<HTMLImageElement> {
   const previous = cache.get(src);
@@ -33,16 +35,13 @@ export async function readPhoto(file: File) {
   if (!pixels.some((v, i) => i % 4 === 3 && v > 0)) throw new Error('완전히 투명한 이미지입니다. 내용이 있는 사진을 선택해 주세요.');
   return { photo: src, photoName: file.name, photoWidth: image.naturalWidth, photoHeight: image.naturalHeight };
 }
-export async function ensureFonts(text: string) {
-  const sample = `사진과 문장 ${text} ABC123`;
+export async function ensureFonts(text: string, selected: FontId[] = ['noto-sans']) {
+  const sample = `사진과 문장 ${text} ABC123 #005`;
   try {
-    await Promise.all([
-      document.fonts.load('400 36px "Noto Sans KR"', sample),
-      document.fonts.load('700 80px "Noto Sans KR"', sample),
-      document.fonts.load('400 80px "Noto Serif KR"', sample),
-    ]);
+    const requests=[...new Set(['noto-sans',...selected] as FontId[])].flatMap(id=>[400,700].map(weight=>`${weight} 36px ${fontFamily(id)}`));
+    await Promise.all(requests.map(request=>document.fonts.load(request,sample)));
     await document.fonts.ready;
-    if (!document.fonts.check('400 36px "Noto Sans KR"', sample) || !document.fonts.check('400 80px "Noto Serif KR"', sample)) throw new Error('font');
+    if(requests.some(request=>!document.fonts.check(request,sample)))throw new Error('font');
   } catch { throw new Error('글꼴을 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.'); }
 }
 export function download(blob: Blob, filename: string) {

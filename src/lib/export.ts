@@ -10,7 +10,7 @@ export function toPNG(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('이미지를 만들지 못했습니다. 기본 해상도로 다시 시도해 주세요.')), 'image/png'));
 }
 export async function exportPages(p: Project, pages: Page[], scale: number, all: boolean, progress: (s: string) => void, fullOrder: Page[]) {
-  await ensureFonts([p.title,p.subtitle,p.body,p.handle,p.year,p.location,p.camera,p.film,p.description].join(' '));
+  await ensureFonts([p.title,p.subtitle,p.body,p.handle,p.year,p.location,p.camera,p.film,p.description,p.number].join(' '),[p.titleFont,p.bodyFont]);
   const image = await loadImage(p.photo);
   const zip = new JSZip();
   const canvas = document.createElement('canvas');

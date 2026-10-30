@@ -1,12 +1,19 @@
+import type { Page as BrowserPage } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import JSZip from 'jszip';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+async function openExample(page:BrowserPage){
+  await page.goto('/');
+  await page.getByRole('button',{name:'예시 불러오기',exact:true}).click();
+  await page.getByRole('button',{name:'꿈 예시 열기',exact:true}).click();
+}
+
 test('upload, edit, crop, switch templates, persist and export full resolution PNG/ZIP',async({page},testInfo)=>{
   const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/');
+  await openExample(page);
   const all=page.getByRole('button',{name:'전체 다운로드 ZIP'});
   await expect(all).toBeEnabled({timeout:60_000});
   await page.screenshot({path:testInfo.outputPath('editor-original.png'),fullPage:true});
@@ -52,6 +59,7 @@ test('upload, edit, crop, switch templates, persist and export full resolution P
   await expect(page.locator('.thumbnail').first()).toHaveAttribute('aria-label','1페이지 사진 · 정보');
   await expect(page.getByText('브라우저에 저장됨',{exact:true})).toBeVisible();
   await page.reload();
+  await page.getByRole('button',{name:'빛이 머무는 자리 열기',exact:true}).click();
   await expect(all).toBeEnabled();
   await expect(page.getByLabel('제목',{exact:true})).toHaveValue('빛이 머무는 자리');
   await expect(page.getByRole('textbox',{name:'본문',exact:true})).toHaveValue(body);
@@ -90,7 +98,7 @@ test('upload, edit, crop, switch templates, persist and export full resolution P
 });
 
 test('page controls reflow, manual breaks, blank body, validation and mobile layout',async({page},testInfo)=>{
-  await page.goto('/');await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
+  await openExample(page);await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
   const body=page.getByRole('textbox',{name:'본문',exact:true});
   await body.fill('첫 페이지입니다.\n둘째 문장입니다.');
   await body.evaluate((el:HTMLTextAreaElement)=>{el.focus();el.setSelectionRange(10,10);});
@@ -121,7 +129,7 @@ test('page controls reflow, manual breaks, blank body, validation and mobile lay
 });
 
 test('all templates keep maximum-length titles and metadata inside the canvas, with one handle per page',async({page})=>{
-  await page.goto('/');await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
+  await openExample(page);await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeEnabled({timeout:60_000});
   const result=await page.evaluate(async()=>{
     const renderPath='/src/lib/render.ts', defaultPath='/src/defaults.ts',paginationPath='/src/lib/pagination.ts', mediaPath='/src/lib/media.ts';
     const {renderPage,coverBox}=await import(renderPath);
@@ -168,7 +176,7 @@ test('all templates keep maximum-length titles and metadata inside the canvas, w
 
 test('reports missing fonts and blocks export instead of using fallback text',async({page})=>{
   await page.route(/\.woff2?(\?.*)?$/,route=>route.abort('failed'));
-  await page.goto('/');
+  await openExample(page);
   await expect(page.getByRole('alert')).toContainText('글꼴을 불러오지 못했습니다',{timeout:30_000});
   await expect(page.getByRole('button',{name:'전체 다운로드 ZIP'})).toBeDisabled();
 });
